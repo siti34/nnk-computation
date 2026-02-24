@@ -1,1 +1,4 @@
 # nnk-computation
+
+Objective:
+Derive 
