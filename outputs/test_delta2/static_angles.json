@@ -1,0 +1,14 @@
+{
+  "HKA_deg": 182.59,
+  "mLDFA_deg": 85.49,
+  "MPTA_deg": 91.92,
+  "JLCA_deg": 0.0,
+  "mLDTA_deg": 73.08,
+  "knee_offset_mm": 48.92,
+  "lhs_180_minus_HKA": -2.59,
+  "rhs_mLDFA_minus_MPTA_plus_JLCA": -6.43,
+  "delta_lhs_minus_rhs": 3.84,
+  "mLDFA_corr": 84.21,
+  "MPTA_corr": 93.2,
+  "JLCA_corr": -1.28
+}

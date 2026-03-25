@@ -104,6 +104,10 @@ def export_results(results, output_dir: Path) -> None:
         json.dump(angles_dict, f, indent=2)
     print(f"  Static angles -> {output_dir / 'static_angles.json'}")
 
+    #with significant figures delta will be reduced 
+    delta = (180.0 - angles.hka) - (angles.mldfa - angles.mpta + angles.jlca)
+    print(f"hka={angles.hka:.3f}, mldfa={angles.mldfa:.3f}, mpta={angles.mpta:.3f}, jlca={angles.jlca:.3f}, delta={delta:.2f}")
+    
     # Export landmarks
     landmarks_dict = {
         name: {"x": round(float(pos[0]), 3),
@@ -217,6 +221,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         app.run(debug=False, port=args.port)
 
     return 0
+
 
 
 if __name__ == "__main__":
