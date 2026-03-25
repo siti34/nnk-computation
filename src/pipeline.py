@@ -177,6 +177,9 @@ def run_pipeline(
     all_global_landmarks: Dict[str, np.ndarray] = {}
     all_local_landmarks: Dict[str, np.ndarray] = {}
 
+    # Accumulate all measurements per landmark for weighted averaging
+    _landmark_measurements: Dict[str, List[Tuple[np.ndarray, np.ndarray]]] = {}
+
     for trial_name, landmark_names in landmark_mapping.items():
         if trial_name not in trials:
             print(f"  Warning: Trial '{trial_name}' not found, skipping.")
@@ -186,29 +189,50 @@ def run_pipeline(
         trial = trials[trial_name]
 
         # Register landmarks (auto-segmentation)
-        global_lms = register_landmarks(trial, landmark_names, **seg_params)
+        global_lms, global_stds = register_landmarks(
+            trial, landmark_names, **seg_params)
 
-        # Merge landmarks — average if a landmark was already registered
-        for name, pos in global_lms.items():
-            if name in all_global_landmarks:
-                prev = all_global_landmarks[name]
-                avg = (prev + pos) / 2.0
-                dist = np.linalg.norm(prev - pos)
-                print(f"    Averaging repeated '{name}': "
-                      f"distance={dist:.2f} mm between measurements")
-                all_global_landmarks[name] = avg
-            else:
-                all_global_landmarks[name] = pos
-
-        # Express in appropriate cluster LCS
         for name in global_lms:
-            pos = all_global_landmarks[name]
-            if name in FEMORAL_LANDMARK_NAMES:
-                all_local_landmarks[name] = express_landmark_in_lcs(
-                    pos, femoral_ref)
-            elif name in TIBIAL_LANDMARK_NAMES:
-                all_local_landmarks[name] = express_landmark_in_lcs(
-                    pos, tibial_ref)
+            if name not in _landmark_measurements:
+                _landmark_measurements[name] = []
+            _landmark_measurements[name].append(
+                (global_lms[name], global_stds[name]))
+
+    # Merge landmarks — inverse-variance weighted average when repeated
+    print("\n  Merging repeated landmarks (inverse-variance weighting):")
+    for name, measurements in _landmark_measurements.items():
+        if len(measurements) == 1:
+            all_global_landmarks[name] = measurements[0][0]
+        else:
+            positions = np.array([m[0] for m in measurements])
+            stds = np.array([m[1] for m in measurements])
+            # Inverse-variance weighting per axis
+            variances = np.maximum(stds ** 2, 1e-6)
+            weights = 1.0 / variances
+            weight_sum = np.sum(weights, axis=0)
+            weighted_avg = np.sum(positions * weights, axis=0) / weight_sum
+
+            naive_avg = np.mean(positions, axis=0)
+            dist = np.linalg.norm(positions[0] - positions[-1])
+            shift = np.linalg.norm(weighted_avg - naive_avg)
+            rel_weights = weights / weight_sum
+            print(f"    '{name}': {len(measurements)} measurements, "
+                  f"spread={dist:.2f} mm, "
+                  f"shift from naive avg={shift:.3f} mm")
+            for i, (_, m_std) in enumerate(measurements):
+                w = rel_weights[i]
+                print(f"      meas {i+1}: std={m_std.round(3)}, "
+                      f"weight=[{w[0]:.2f}, {w[1]:.2f}, {w[2]:.2f}]")
+            all_global_landmarks[name] = weighted_avg
+
+    # Express in appropriate cluster LCS
+    for name, pos in all_global_landmarks.items():
+        if name in FEMORAL_LANDMARK_NAMES:
+            all_local_landmarks[name] = express_landmark_in_lcs(
+                pos, femoral_ref)
+        elif name in TIBIAL_LANDMARK_NAMES:
+            all_local_landmarks[name] = express_landmark_in_lcs(
+                pos, tibial_ref)
 
     # Estimate LFEC if not digitized (mirror MFEC along medial-lateral axis)
     if "LFEC" not in all_global_landmarks:
@@ -254,7 +278,8 @@ def run_pipeline(
         raise ValueError("No rotation trials found for HJC computation.")
 
     print(f"  Using {len(rotation_trials)} rotation trial(s)")
-    hjc_result = compute_hjc(rotation_trials, FEMORAL_MARKERS, method=hjc_method)
+    hjc_result = compute_hjc(rotation_trials, FEMORAL_MARKERS, method=hjc_method,
+                             reference=femoral_ref)
     print(f"  HJC position: {hjc_result.position.round(2)} mm")
     print(f"  Sphere radius: {hjc_result.radius:.2f} mm")
     print(f"  Residual std: {hjc_result.residual_std:.3f} mm")

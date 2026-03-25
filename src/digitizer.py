@@ -225,7 +225,9 @@ def register_landmarks(
             If provided, any segment within 20mm of this position is removed.
 
     Returns:
-        Dict mapping landmark names to (3,) global positions.
+        Tuple of (landmarks, landmark_stds):
+            landmarks: Dict mapping landmark names to (3,) global positions.
+            landmark_stds: Dict mapping landmark names to (3,) per-axis std (mm).
 
     Raises:
         ValueError: If number of detected segments doesn't match landmark count.
@@ -262,12 +264,14 @@ def register_landmarks(
         )
 
     landmarks = {}
+    landmark_stds = {}
     for seg, name in zip(segments, landmark_names):
         landmarks[name] = seg.position
+        landmark_stds[name] = seg.std
         print(f"  Landmark '{name}': position={seg.position.round(2)} mm, "
               f"std={seg.std.round(3)} mm, frames={seg.start_frame}-{seg.end_frame}")
 
-    return landmarks
+    return landmarks, landmark_stds
 
 
 def express_landmark_in_lcs(
@@ -313,7 +317,7 @@ def register_and_localize(
         global_landmarks: {name: (3,) global position}
         local_landmarks: {name: (3,) local position in appropriate cluster LCS}
     """
-    global_landmarks = register_landmarks(trial, landmark_names, **kwargs)
+    global_landmarks, _ = register_landmarks(trial, landmark_names, **kwargs)
 
     local_landmarks = {}
     for name, pos in global_landmarks.items():

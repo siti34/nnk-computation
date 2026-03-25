@@ -14,7 +14,7 @@ import numpy as np
 from scipy.optimize import least_squares
 
 from .data_loader import TrialData
-from .utils import average_positions
+from .utils import average_positions, inter_marker_distances, rms_error
 
 
 @dataclass
@@ -85,9 +85,50 @@ def fit_sphere(points: np.ndarray) -> Tuple[np.ndarray, float, float]:
     return center, abs(radius), residual_std
 
 
+def _compute_rigidity_mask(
+    trial: TrialData,
+    marker_names: List[str],
+    ref_distances: np.ndarray,
+    threshold: float,
+) -> np.ndarray:
+    """Compute a boolean mask of frames passing the rigidity check.
+
+    Args:
+        trial: Trial data.
+        marker_names: Marker names in the cluster.
+        ref_distances: Reference pairwise inter-marker distances.
+        threshold: Max acceptable RMS deviation (mm).
+
+    Returns:
+        (N_frames,) boolean mask — True for frames that pass.
+    """
+    n_frames = trial.get_marker(marker_names[0]).shape[0]
+    mask = np.zeros(n_frames, dtype=bool)
+
+    for i in range(n_frames):
+        positions = []
+        valid = True
+        for name in marker_names:
+            pos = trial.get_marker(name)[i]
+            if np.any(np.isnan(pos)):
+                valid = False
+                break
+            positions.append(pos)
+        if not valid:
+            continue
+        cur_dists = inter_marker_distances(np.array(positions))
+        rms = rms_error(np.abs(cur_dists - ref_distances))
+        if rms <= threshold:
+            mask[i] = True
+
+    return mask
+
+
 def compute_hjc(rotation_trials: List[TrialData],
                 marker_names: List[str],
-                method: str = "pooled") -> HJCResult:
+                method: str = "pooled",
+                reference: Optional["RigidBodyReference"] = None,
+                rigidity_threshold: float = 1.0) -> HJCResult:
     """Estimate Hip Joint Center using the pivot/sphere-fit method.
 
     During hip rotation trials, each femoral marker traces an arc on a sphere
@@ -99,19 +140,45 @@ def compute_hjc(rotation_trials: List[TrialData],
         marker_names: Femoral marker names (e.g., ["F1", "F2", "F3", "F4", "FC"]).
         method: "pooled" (fit one sphere to ALL marker data) or
                 "per_marker" (fit separate spheres, take consensus center).
+        reference: Optional RigidBodyReference for rigidity-based frame gating.
+            When provided, frames where the cluster deformation exceeds
+            rigidity_threshold are excluded before sphere fitting.
+        rigidity_threshold: Max RMS inter-marker distance deviation (mm)
+            for a frame to be included. Only used when reference is provided.
 
     Returns:
         HJCResult with estimated HJC position and quality metrics.
     """
     # Collect trajectories from all rotation trials
     all_trajectories: Dict[str, List[np.ndarray]] = {m: [] for m in marker_names}
+    total_frames = 0
+    kept_frames = 0
+
     for trial in rotation_trials:
+        n_frames = trial.get_marker(marker_names[0]).shape[0]
+
+        # Build per-frame validity mask
+        if reference is not None:
+            rigidity_mask = _compute_rigidity_mask(
+                trial, marker_names, reference.reference_distances,
+                rigidity_threshold)
+            total_frames += n_frames
+            kept_frames += int(np.sum(rigidity_mask))
+        else:
+            rigidity_mask = np.ones(n_frames, dtype=bool)
+
         for marker in marker_names:
             traj = trial.get_marker(marker)
-            # Filter NaN frames
-            valid = ~np.any(np.isnan(traj), axis=1)
-            if np.any(valid):
-                all_trajectories[marker].append(traj[valid])
+            # Filter NaN frames AND rigidity-failed frames
+            nan_valid = ~np.any(np.isnan(traj), axis=1)
+            combined = nan_valid & rigidity_mask
+            if np.any(combined):
+                all_trajectories[marker].append(traj[combined])
+
+    if reference is not None:
+        pct = (kept_frames / total_frames * 100) if total_frames else 0
+        print(f"  Rigidity gating: kept {kept_frames}/{total_frames} frames "
+              f"({pct:.1f}%, threshold={rigidity_threshold} mm)")
 
     if method == "pooled":
         return _hjc_pooled(all_trajectories, marker_names)
