@@ -1,6 +1,8 @@
 # HTO Mechanical Axis Computation Pipeline
 
-A Python pipeline for computing lower-limb mechanical axis alignment angles used in High Tibial Osteotomy (HTO) surgical planning. The pipeline processes Vicon motion capture marker trajectory data captured on a phantom sawbones knee model, estimates joint centres via rigid body tracking and sphere-fitting, and outputs five clinically relevant frontal-plane angles. For the full mathematical specification, see [docs/algorithm_specification.md](docs/algorithm_specification.md).
+Goal: Computing lower-limb mechanical axis alignment angles used in High Tibial Osteotomy (HTO) surgical planning.
+
+The pipeline takes in Vicon motion capture marker trajectory data captured on a phantom knee model (Synbone model in this case), estimates joint centres via rigid body tracking and sphere-fitting, and outputs five clinically relevant frontal-plane angles. For the full mathematical specification, see [docs/algorithm_specification.md](docs/algorithm_specification.md).
 
 ---
 
@@ -8,46 +10,61 @@ A Python pipeline for computing lower-limb mechanical axis alignment angles used
 
 ### Objective
 
-Derive the mechanical axis alignment of the lower limb from 3D marker trajectory data and compute the standard HTO planning angles (HKA, mLDFA, MPTA, JLCA, mLDTA). The phantom sawbones model eliminates soft tissue artefact, providing a rigid-body ground truth for algorithm validation before clinical application.
+Derive the mechanical axis alignment of the lower limb from 3D marker trajectory data and compute the standard HTO planning angles (HKA, mLDFA, MPTA, JLCA, mLDTA). The phantom model eliminates soft tissue artefact, providing a rigid-body ground truth for algorithm validation before clinical application.
 
 ### Physical Setup
 
-- **Model:** Commercially available synthetic femur + tibia assembly with anatomically representative geometry.
+- **Model:** Synbone Model.
 - **Motion capture:** Vicon system at 100 Hz, coordinates in millimetres.
 - **Force plates:** AMTI (captured but not used in this pipeline).
 
-Three rigid marker clusters, each with five retroreflective markers, are attached to the model and to a handheld digitiser tool:
+Three rigid marker clusters, each with five retroreflective markers, are attached to the model and to a digitiser:
 
-| Cluster | Markers | Attachment | Purpose |
-|---------|---------|------------|---------|
-| Femoral | F1, F2, F3, F4, FC | Rigid plate screwed to the femoral shaft | Track femoral segment pose |
-| Tibial | T1, T2, T3, T4, TC | Rigid plate screwed to the tibial shaft | Track tibial segment pose |
-| Digitiser | D1, D2, D3, D4, DT | Handheld rigid tool | Register anatomical landmarks (DT = tip) |
+| Cluster   | Markers            | Attachment                               | Purpose                                  |
+| --------- | ------------------ | ---------------------------------------- | ---------------------------------------- |
+| Femoral   | F1, F2, F3, F4, FC | Rigid plate screwed to the femoral shaft | Track femoral segment pose               |
+| Tibial    | T1, T2, T3, T4, TC | Rigid plate screwed to the tibial shaft  | Track tibial segment pose                |
+| Digitiser | D1, D2, D3, D4, DT | Handheld rigid tool                      | Register anatomical landmarks (DT = tip) |
+
+<p align="center">
+  <img src="assets/marker_placements.jpg" width="600" alt="Femoral and tibial marker clusters on the Synbone model" /><br/>
+  <em>Femoral cluster (F1-F4, FC) on the femoral shaft and tibial cluster (T1-T4, TC) on the tibial shaft, mounted on the Synbone model with AMTI force plate in background.</em>
+</p>
+
+<p align="center">
+  <img src="assets/digitizer_markers.jpg" width="350" alt="Handheld digitiser tool" /><br/>
+  <em>Handheld digitiser tool with four reference markers (D1-D4) and the digitiser tip (DT) at the bottom, used to register anatomical landmarks.</em>
+</p>
 
 ### Anatomical Landmarks
 
 Six bony prominences are digitised on the phantom model by placing the digitiser tip (DT) on each point while the relevant cluster is simultaneously visible:
 
-| Abbreviation | Full Name | Anatomical Description | Segment |
-|-------------|-----------|------------------------|---------|
-| LFEC | Lateral Femoral Epicondyle | Most prominent point on the lateral femoral epicondyle | Femur |
-| MFEC | Medial Femoral Epicondyle | Most prominent point on the medial femoral epicondyle | Femur |
-| LTP | Lateral Tibial Plateau | Most lateral point on the proximal tibial articular surface | Tibia |
-| MTP | Medial Tibial Plateau | Most medial point on the proximal tibial articular surface | Tibia |
-| LM | Lateral Malleolus | Most prominent point on the lateral malleolus (distal fibula) | Tibia |
-| MM | Medial Malleolus | Most prominent point on the medial malleolus (distal tibia) | Tibia |
+| Abbreviation | Full Name                  | Anatomical Description                                        | Segment |
+| ------------ | -------------------------- | ------------------------------------------------------------- | ------- |
+| LFEC         | Lateral Femoral Epicondyle | Most prominent point on the lateral femoral epicondyle        | Femur   |
+| MFEC         | Medial Femoral Epicondyle  | Most prominent point on the medial femoral epicondyle         | Femur   |
+| LTP          | Lateral Tibial Plateau     | Most lateral point on the proximal tibial articular surface   | Tibia   |
+| MTP          | Medial Tibial Plateau      | Most medial point on the proximal tibial articular surface    | Tibia   |
+| LM           | Lateral Malleolus          | Most prominent point on the lateral malleolus (distal fibula) | Tibia   |
+| MM           | Medial Malleolus           | Most prominent point on the medial malleolus (distal tibia)   | Tibia   |
 
 LFEC and MFEC are registered relative to the **femoral** cluster. LTP, MTP, LM, and MM are registered relative to the **tibial** cluster. In the current protocol LFEC is estimated by mirroring MFEC across the knee midline when not directly digitised.
 
+<p align="center">
+  <img src="assets/anatomical_points.jpg" width="600" alt="Anatomical landmark and marker placement reference diagram" /><br/>
+  <em>Whiteboard reference diagram showing anatomical landmark locations on the femur and tibia. Key landmarks labelled: LFEC and MFEC (distal femur), MTC/LTC (tibial condyles corresponding to MTP/LTP), MM and LM (malleoli). Cluster marker placement regions (UFD/LFD on the femur, UTD/LTD on the tibia) are also indicated.</em>
+</p>
+
 ### Trial Protocol
 
-| Trial Type | Example Files (04-Feb) | What Was Done |
-|------------|----------------------|---------------|
-| Static | `Static_Trial01.csv` | Model stationary, all clusters visible. Used to build reference local coordinate systems. |
-| Digitiser | `Digitizer_trial.csv`, `Digitizer_trial 1.csv` | Digitiser tip placed sequentially on anatomical landmarks while clusters remain visible. |
+| Trial Type     | Example Files (04-Feb)                                            | What Was Done                                                                                     |
+| -------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Static         | `Static_Trial01.csv`                                              | Model stationary, all clusters visible. Used to build reference local coordinate systems.         |
+| Digitiser      | `Digitizer_trial.csv`, `Digitizer_trial 1.csv`                    | Digitiser tip placed sequentially on anatomical landmarks while clusters remain visible.          |
 | Rotation (HJC) | `Dynamic Trial.csv`, `Dynamic Trial 1.csv`, `Dynamic Trial 2.csv` | Femur rotated about the hip joint so femoral markers trace arcs on spheres centred at the hip. |
-| Left-Right | `Dynamic Trial_Left_Right_Motion.csv`, `...Motion 1.csv` | Lateral-medial knee motion for dynamic angle tracking. |
-| Up-Down | `Dynamic Trial_Up_Down_Motion.csv`, `...Motion 1.csv` | Flexion-extension motion for dynamic angle tracking. |
+| Left-Right     | `Dynamic Trial_Left_Right_Motion.csv`, `...Motion 1.csv`          | Lateral-medial knee motion for dynamic angle tracking.                                            |
+| Up-Down        | `Dynamic Trial_Up_Down_Motion.csv`, `...Motion 1.csv`             | Flexion-extension motion for dynamic angle tracking.                                              |
 
 ---
 
@@ -55,13 +72,13 @@ LFEC and MFEC are registered relative to the **femoral** cluster. LTP, MTP, LM, 
 
 All angles are measured in the **frontal (coronal) plane** of the lower limb.
 
-| Angle | Full Name | What It Measures | Normal Value |
-|-------|-----------|-----------------|-------------|
-| HKA | Hip-Knee-Ankle | Overall lower-limb alignment at the knee between the femoral and tibial mechanical axes | 180 deg (neutral) |
-| mLDFA | Mechanical Lateral Distal Femoral Angle | Orientation of the distal femoral joint line relative to the femoral mechanical axis | 85-90 deg |
-| MPTA | Medial Proximal Tibial Angle | Orientation of the proximal tibial joint line relative to the tibial mechanical axis (primary HTO target) | 85-90 deg |
-| JLCA | Joint Line Convergence Angle | Angular convergence between the distal femoral and proximal tibial joint lines | 0-2 deg |
-| mLDTA | Mechanical Lateral Distal Tibial Angle | Orientation of the distal tibial joint line (ankle) relative to the tibial mechanical axis | ~89 deg |
+| Angle | Full Name                               | What It Measures                                                                                          | Normal Value      |
+| ----- | --------------------------------------- | --------------------------------------------------------------------------------------------------------- | ----------------- |
+| HKA   | Hip-Knee-Ankle                          | Overall lower-limb alignment at the knee between the femoral and tibial mechanical axes                   | 180 deg (neutral) |
+| mLDFA | Mechanical Lateral Distal Femoral Angle | Orientation of the distal femoral joint line relative to the femoral mechanical axis                      | 85-90 deg         |
+| MPTA  | Medial Proximal Tibial Angle            | Orientation of the proximal tibial joint line relative to the tibial mechanical axis (primary HTO target) | 85-90 deg         |
+| JLCA  | Joint Line Convergence Angle            | Angular convergence between the distal femoral and proximal tibial joint lines                            | 0-2 deg           |
+| mLDTA | Mechanical Lateral Distal Tibial Angle  | Orientation of the distal tibial joint line (ankle) relative to the tibial mechanical axis                | ~89 deg           |
 
 The **mLPFA** (Mechanical Lateral Proximal Femoral Angle) is not computable with the current marker set because the greater trochanter is not digitised.
 
@@ -101,16 +118,16 @@ An **alternative algebraic pipeline** (`main_algebraic.py`) replaces the nonline
 
 ### Source Modules (`src/`)
 
-| Module | Purpose |
-|--------|---------|
-| `data_loader.py` | Load and parse Vicon CSV files |
-| `rigid_body.py` | LCS construction and Kabsch pose tracking |
-| `joint_centers.py` | Joint centre estimation (sphere-fit, midpoint) |
-| `angles.py` | Frontal-plane HTO angle computation |
-| `digitizer.py` | Anatomical landmark registration |
-| `algebraic_sphere_fit.py` | Linearised sphere-fit (Mathematica reference) |
-| `pipeline.py` | End-to-end pipeline orchestration |
-| `utils.py` | Shared mathematical utilities |
+| Module                    | Purpose                                        |
+| ------------------------- | ---------------------------------------------- |
+| `data_loader.py`          | Load and parse Vicon CSV files                 |
+| `rigid_body.py`           | LCS construction and Kabsch pose tracking      |
+| `joint_centers.py`        | Joint centre estimation (sphere-fit, midpoint) |
+| `angles.py`               | Frontal-plane HTO angle computation            |
+| `digitizer.py`            | Anatomical landmark registration               |
+| `algebraic_sphere_fit.py` | Linearised sphere-fit (Mathematica reference)  |
+| `pipeline.py`             | End-to-end pipeline orchestration              |
+| `utils.py`                | Shared mathematical utilities                  |
 
 **`data_loader.py`** -- Loads Vicon-exported CSV files that use a dual-structure format: force plate data above a "Trajectories" keyword, marker trajectories below. Provides the `TrialData` dataclass and `load_all_trials()` which maps descriptive trial names (e.g. `static`, `digitizer_1`, `rotation_1`) to file paths. Defines marker group constants (`FEMORAL_MARKERS`, `TIBIAL_MARKERS`, `DIGITIZER_MARKERS`).
 
@@ -148,13 +165,13 @@ An **alternative algebraic pipeline** (`main_algebraic.py`) replaces the nonline
 
 ### Outputs
 
-| Output File | Format | Description |
-|-------------|--------|-------------|
-| `static_angles.json` | JSON | Static-trial HTO angles (HKA, mLDFA, MPTA, JLCA, mLDTA) and knee offset in mm |
-| `landmarks.json` | JSON | Anatomical landmark positions and joint centres (HJC, KJC, AJC) in global coordinates |
-| `landmarks_2.json` | JSON | Algebraic pipeline output: landmarks, angles, and per-marker sphere-fit radii for comparison |
-| `angles_<trial>.csv` | CSV | Per-frame time-series of all five angles for each dynamic trial (columns: time, hka, mldfa, mpta, jlca, mldta) |
-| `rigidity_validation.json` | JSON | Per-trial per-cluster rigidity check: mean RMS deviation, max deviation, pass/fail status |
+| Output File                | Format | Description                                                                                                    |
+| -------------------------- | ------ | -------------------------------------------------------------------------------------------------------------- |
+| `static_angles.json`       | JSON   | Static-trial HTO angles (HKA, mLDFA, MPTA, JLCA, mLDTA) and knee offset in mm                                  |
+| `landmarks.json`           | JSON   | Anatomical landmark positions and joint centres (HJC, KJC, AJC) in global coordinates                          |
+| `landmarks_2.json`         | JSON   | Algebraic pipeline output: landmarks, angles, and per-marker sphere-fit radii for comparison                   |
+| `angles_<trial>.csv`       | CSV    | Per-frame time-series of all five angles for each dynamic trial (columns: time, hka, mldfa, mpta, jlca, mldta) |
+| `rigidity_validation.json` | JSON   | Per-trial per-cluster rigidity check: mean RMS deviation, max deviation, pass/fail status                      |
 
 ### Documentation
 
@@ -178,16 +195,16 @@ Dependencies: `pandas >= 2.0`, `numpy >= 1.24`, `scipy >= 1.10`, `plotly >= 5.15
 python main.py --data-dir data/04-Feb-Trials/
 ```
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--data-dir` | (required) | Path to directory containing trial CSV files |
-| `--output-dir` | `outputs/` | Directory for output files |
-| `--landmark-config` | built-in | Path to JSON file mapping digitiser trial names to landmark names |
-| `--hjc-method` | `per_marker` | HJC estimation method: `pooled` or `per_marker` |
-| `--velocity-threshold` | `15.0` | Digitiser velocity threshold in mm/s for contact detection |
-| `--min-contact-duration` | `0.5` | Minimum digitiser contact duration in seconds |
-| `--visualize` | off | Launch 3D Dash visualisation after pipeline completes |
-| `--port` | `8050` | Port for the Dash visualisation server |
+| Flag                     | Default      | Description                                                       |
+| ------------------------ | ------------ | ----------------------------------------------------------------- |
+| `--data-dir`             | (required)   | Path to directory containing trial CSV files                      |
+| `--output-dir`           | `outputs/`   | Directory for output files                                        |
+| `--landmark-config`      | built-in     | Path to JSON file mapping digitiser trial names to landmark names |
+| `--hjc-method`           | `per_marker` | HJC estimation method: `pooled` or `per_marker`                   |
+| `--velocity-threshold`   | `15.0`       | Digitiser velocity threshold in mm/s for contact detection        |
+| `--min-contact-duration` | `0.5`        | Minimum digitiser contact duration in seconds                     |
+| `--visualize`            | off          | Launch 3D Dash visualisation after pipeline completes             |
+| `--port`                 | `8050`       | Port for the Dash visualisation server                            |
 
 Examples:
 
@@ -252,10 +269,10 @@ nnk-computation/
 
 ## References
 
-1. Paley D. *Principles of Deformity Correction.* Springer-Verlag, 2002.
-2. Grood ES, Suntay WJ. A joint coordinate system for the clinical description of three-dimensional motions. *J Biomech Eng.* 1983;105(2):136-144.
-3. Soderkvist I, Wedin PA. Determining the movements of the skeleton using well-configured markers. *J Biomech.* 1993;26(12):1473-1477.
-4. Gamage SSHU, Lasenby J. New least squares solutions for estimating the average centre of rotation and the axis of rotation. *J Biomech.* 2002;35(1):87-93.
-5. Kabsch W. A solution for the best rotation to relate two sets of vectors. *Acta Cryst A.* 1976;32(5):922-923.
-6. Ehrig RM, Taylor WR, Duda GN, Heller MO. A survey of formal methods for determining the centre of rotation of ball joints. *J Biomech.* 2006;39(15):2798-2809.
-7. Miniaci A, Ballmer FT, Ballmer PM, Jakob RP. Proximal tibial osteotomy: a new fixation device. *Clin Orthop Relat Res.* 1989;(246):250-259.
+1. Paley D. _Principles of Deformity Correction._ Springer-Verlag, 2002.
+2. Grood ES, Suntay WJ. A joint coordinate system for the clinical description of three-dimensional motions. _J Biomech Eng._ 1983;105(2):136-144.
+3. Soderkvist I, Wedin PA. Determining the movements of the skeleton using well-configured markers. _J Biomech._ 1993;26(12):1473-1477.
+4. Gamage SSHU, Lasenby J. New least squares solutions for estimating the average centre of rotation and the axis of rotation. _J Biomech._ 2002;35(1):87-93.
+5. Kabsch W. A solution for the best rotation to relate two sets of vectors. _Acta Cryst A._ 1976;32(5):922-923.
+6. Ehrig RM, Taylor WR, Duda GN, Heller MO. A survey of formal methods for determining the centre of rotation of ball joints. _J Biomech._ 2006;39(15):2798-2809.
+7. Miniaci A, Ballmer FT, Ballmer PM, Jakob RP. Proximal tibial osteotomy: a new fixation device. _Clin Orthop Relat Res._ 1989;(246):250-259.
