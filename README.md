@@ -53,7 +53,7 @@ LFEC and MFEC are registered relative to the **femoral** cluster. LTP, MTP, LM, 
 
 <p align="center">
   <img src="assets/anatomical_points.jpg" width="600" alt="Anatomical landmark and marker placement reference diagram" /><br/>
-  <em>Whiteboard reference diagram showing anatomical landmark locations on the femur and tibia. Key landmarks labelled: LFEC and MFEC (distal femur), MTC/LTC (tibial condyles corresponding to MTP/LTP), MM and LM (malleoli). Cluster marker placement regions (UFD/LFD on the femur, UTD/LTD on the tibia) are also indicated.</em>
+  <em>Reference diagram showing anatomical landmark locations on the femur and tibia. Key landmarks labelled: LFEC and MFEC (distal femur), MTC/LTC (tibial condyles corresponding to MTP/LTP), MM and LM (malleoli). Cluster marker placement regions (UFD/LFD on the femur, UTD/LTD on the tibia) are also indicated.</em>
 </p>
 
 ### Trial Protocol
@@ -96,13 +96,13 @@ where `HKA_deviation = 180 - HKA`. This relationship (Paley, 2002) serves as an 
 
 The processing workflow consists of seven steps, implemented in `src/pipeline.py`:
 
-1. **Load trial data** -- Parse all Vicon CSV files (static, digitiser, rotation, dynamic) using the dual-structure format (force plate section + trajectory section).
-2. **Build reference LCS** -- Construct a local coordinate system for each marker cluster from the static trial via Singular Value Decomposition (SVD) of the mean-centred marker positions.
-3. **Detect marker swaps** -- Check for and correct marker label inconsistencies between trials by comparing inter-marker distance patterns against the static reference.
-4. **Register anatomical landmarks** -- Auto-segment the digitiser tip (DT) trajectory to detect stationary contact periods, extract landmark positions, and express them in cluster-local coordinates.
-5. **Estimate joint centres** -- Compute the Hip Joint Centre (HJC) by fitting spheres to femoral marker trajectories during rotation trials (Levenberg-Marquardt optimisation). Compute the Knee Joint Centre (KJC) as the epicondyle midpoint and the Ankle Joint Centre (AJC) as the malleoli midpoint.
-6. **Compute clinical angles** -- Define the frontal plane from the femoral mechanical axis and transepicondylar axis, then compute all five HTO angles by projecting relevant vectors onto this plane.
-7. **Export results** -- Write static angles, landmarks, dynamic angle time-series, and rigidity validation to JSON and CSV files.
+1. **Load trial data** : Parse all Vicon CSV files (static, digitiser, rotation, dynamic) using the dual-structure format (force plate section + trajectory section).
+2. **Build reference LCS**: Construct a local coordinate system for each marker cluster from the static trial via Singular Value Decomposition (SVD) of the mean-centred marker positions.
+3. **Detect marker swaps** : Check for and correct marker label inconsistencies between trials by comparing inter-marker distance patterns against the static reference.
+4. **Register anatomical landmarks**: Auto-segment the digitiser tip (DT) trajectory to detect stationary contact periods, extract landmark positions, and express them in cluster-local coordinates.
+5. **Estimate joint centres**: Compute the Hip Joint Centre (HJC) by fitting spheres to femoral marker trajectories during rotation trials (Levenberg-Marquardt optimisation). Compute the Knee Joint Centre (KJC) as the epicondyle midpoint and the Ankle Joint Centre (AJC) as the malleoli midpoint.
+6. **Compute clinical angles**: Define the frontal plane from the femoral mechanical axis and transepicondylar axis, then compute all five HTO angles by projecting relevant vectors onto this plane.
+7. **Export results**: Write static angles, landmarks, dynamic angle time-series, and rigidity validation to JSON and CSV files.
 
 An **alternative algebraic pipeline** (`main_algebraic.py`) replaces the nonlinear sphere-fit in step 5 with a linearised least-squares approach that mirrors the Mathematica reference implementation, allowing direct cross-validation.
 
@@ -112,9 +112,9 @@ An **alternative algebraic pipeline** (`main_algebraic.py`) replaces the nonline
 
 ### Entry Points
 
-**`main.py`** -- Primary CLI entry point. Parses command-line arguments, invokes the full pipeline, exports results to JSON and CSV, and optionally launches the interactive 3D visualisation. Supports configurable HJC method, digitiser segmentation parameters, and custom landmark mappings.
+**`main.py`**: Primary CLI entry point. Parses command-line arguments, invokes the full pipeline, exports results to JSON and CSV, and optionally launches the interactive 3D visualisation. Supports configurable HJC method, digitiser segmentation parameters, and custom landmark mappings.
 
-**`main_algebraic.py`** -- Alternative entry point using the algebraic (linearised) sphere-fit for HJC and KJC estimation. Mirrors the Mathematica reference implementation. Outputs `landmarks_2.json` for comparison with the primary pipeline. Does not process dynamic trials or launch visualisation.
+**`main_algebraic.py`**: Alternative entry point using the algebraic (linearised) sphere-fit for HJC and KJC estimation. Mirrors the Mathematica reference implementation. Outputs `landmarks_2.json` for comparison with the primary pipeline. Does not process dynamic trials or launch visualisation.
 
 ### Source Modules (`src/`)
 
@@ -131,37 +131,37 @@ An **alternative algebraic pipeline** (`main_algebraic.py`) replaces the nonline
 
 **`data_loader.py`** -- Loads Vicon-exported CSV files that use a dual-structure format: force plate data above a "Trajectories" keyword, marker trajectories below. Provides the `TrialData` dataclass and `load_all_trials()` which maps descriptive trial names (e.g. `static`, `digitizer_1`, `rotation_1`) to file paths. Defines marker group constants (`FEMORAL_MARKERS`, `TIBIAL_MARKERS`, `DIGITIZER_MARKERS`).
 
-**`rigid_body.py`** -- Implements LCS construction from a static trial via SVD (`build_reference()`) and the Kabsch algorithm for frame-by-frame rigid body pose tracking (`kabsch_align()`, `track_dynamic_trial()`). Provides global coordinate transforms for landmarks (`transform_point_to_global()`), rigidity validation via inter-marker distance monitoring (`validate_rigidity()`), and marker label swap detection and correction (`detect_marker_swap()`). Key dataclasses: `RigidBodyReference` and `FramePose`.
+**`rigid_body.py`**: Implements LCS construction from a static trial via SVD (`build_reference()`) and the Kabsch algorithm for frame-by-frame rigid body pose tracking (`kabsch_align()`, `track_dynamic_trial()`). Provides global coordinate transforms for landmarks (`transform_point_to_global()`), rigidity validation via inter-marker distance monitoring (`validate_rigidity()`), and marker label swap detection and correction (`detect_marker_swap()`). Key dataclasses: `RigidBodyReference` and `FramePose`.
 
-**`joint_centers.py`** -- Estimates the HJC via nonlinear least-squares sphere fitting (Levenberg-Marquardt via `scipy.optimize.least_squares`). Supports two methods: `pooled` (single sphere fitted to all markers) and `per_marker` (consensus of independently fitted per-marker spheres). Computes KJC as the midpoint of the femoral epicondyles and AJC as the midpoint of the malleoli. Key dataclass: `HJCResult`.
+**`joint_centers.py`**: Estimates the HJC via nonlinear least-squares sphere fitting (Levenberg-Marquardt via `scipy.optimize.least_squares`). Supports two methods: `pooled` (single sphere fitted to all markers) and `per_marker` (consensus of independently fitted per-marker spheres). Computes KJC as the midpoint of the femoral epicondyles and AJC as the midpoint of the malleoli. Key dataclass: `HJCResult`.
 
-**`angles.py`** -- Computes the five HTO clinical angles in the frontal plane. Constructs the frontal plane normal from the femoral mechanical axis cross the transepicondylar axis. Each angle function projects the relevant vectors onto this plane and computes the inter-vector angle. Conventions follow Paley's deformity analysis framework. Key dataclass: `HTOAngles`.
+**`angles.py`**: Computes the five HTO clinical angles in the frontal plane. Constructs the frontal plane normal from the femoral mechanical axis cross the transepicondylar axis. Each angle function projects the relevant vectors onto this plane and computes the inter-vector angle. Conventions follow Paley's deformity analysis framework. Key dataclass: `HTOAngles`.
 
-**`digitizer.py`** -- Handles anatomical landmark registration from digitiser trials. Implements auto-segmentation of the digitiser tip trajectory by detecting stationary contact periods where velocity drops below a configurable threshold. Strips rest-position segments from the start and end of trials. Assigns detected segments to landmark names in the order specified by the user. Also provides `express_landmark_in_lcs()` for converting global landmark positions to cluster-local coordinates.
+**`digitizer.py`**: Handles anatomical landmark registration from digitiser trials. Implements auto-segmentation of the digitiser tip trajectory by detecting stationary contact periods where velocity drops below a configurable threshold. Strips rest-position segments from the start and end of trials. Assigns detected segments to landmark names in the order specified by the user. Also provides `express_landmark_in_lcs()` for converting global landmark positions to cluster-local coordinates.
 
-**`algebraic_sphere_fit.py`** -- Implements the linearised least-squares sphere-fitting approach from the Mathematica reference notebook. Solves a linear system for a shared centre with per-marker radii. Used by `main_algebraic.py` as a cross-validation alternative to the nonlinear sphere-fit in `joint_centers.py`.
+**`algebraic_sphere_fit.py`**: Implements the linearised least-squares sphere-fitting approach from the Mathematica reference notebook. Solves a linear system for a shared centre with per-marker radii. Used by `main_algebraic.py` as a cross-validation alternative to the nonlinear sphere-fit in `joint_centers.py`.
 
-**`pipeline.py`** -- End-to-end orchestrator that coordinates all seven processing steps. Handles LFEC estimation (mirroring MFEC across the knee midline) when it is not directly digitised. Processes all dynamic trials with frame-by-frame Kabsch tracking and angle computation. Provides `extract_angle_time_series()` for converting per-frame angle data to time-indexed arrays. Key dataclasses: `PipelineResults` and `DynamicTrialResult`.
+**`pipeline.py`**: End-to-end orchestrator that coordinates all seven processing steps. Handles LFEC estimation (mirroring MFEC across the knee midline) when it is not directly digitised. Processes all dynamic trials with frame-by-frame Kabsch tracking and angle computation. Provides `extract_angle_time_series()` for converting per-frame angle data to time-indexed arrays. Key dataclasses: `PipelineResults` and `DynamicTrialResult`.
 
-**`utils.py`** -- Shared mathematical helper functions: vector normalisation (`normalize`), angle between vectors (`angle_between_vectors`), signed angle in a plane (`signed_angle_in_plane`), vector and point projection onto a plane (`project_onto_plane`, `project_point_onto_plane`), point-to-line distance (`point_to_line_distance`), right-handedness enforcement (`ensure_right_handed`), centroid computation, RMS error, and inter-marker distance calculation.
+**`utils.py`**: Shared mathematical helper functions: vector normalisation (`normalize`), angle between vectors (`angle_between_vectors`), signed angle in a plane (`signed_angle_in_plane`), vector and point projection onto a plane (`project_onto_plane`, `project_point_onto_plane`), point-to-line distance (`point_to_line_distance`), right-handedness enforcement (`ensure_right_handed`), centroid computation, RMS error, and inter-marker distance calculation.
 
 ### Visualisation
 
-**`visualization/dash_app.py`** -- Interactive 3D web application built with Plotly Dash. Displays marker clusters, anatomical landmarks, joint centres, mechanical axes, joint lines, and LCS axes in a 3D scatter plot. Features include a trial selection dropdown, frame slider with play/pause animation, visibility toggles for each layer, real-time angle readout panel, and HKA time-series chart. Launch via `--visualize` flag in `main.py`.
+**`visualization/dash_app.py`**: Interactive 3D web application built with Plotly Dash. Displays marker clusters, anatomical landmarks, joint centres, mechanical axes, joint lines, and LCS axes in a 3D scatter plot. Features include a trial selection dropdown, frame slider with play/pause animation, visibility toggles for each layer, real-time angle readout panel, and HKA time-series chart. Launch via `--visualize` flag in `main.py`.
 
 ### Reference Implementation
 
-**`Original JL ClusterMarker Compute/CAP02.ipynb`** -- Reference Python/Jupyter notebook implementing the original joint centre computation using SVD-based coordinate frame construction and algebraic sphere-fitting. Used to validate the Python pipeline against prior work.
+**`Original JL ClusterMarker Compute/CAP02.ipynb`**: Reference Python/Jupyter notebook implementing the original joint centre computation using SVD-based coordinate frame construction and algebraic sphere-fitting. Used to validate the Python pipeline against prior work.
 
-**`Original JL ClusterMarker Compute/CAP02_update.nb`** -- Mathematica notebook containing the algebraic sphere-fit approach. The `main_algebraic.py` pipeline mirrors this approach and compares results directly.
+**`Original JL ClusterMarker Compute/CAP02_update.nb`**: Mathematica notebook containing the algebraic sphere-fit approach. The `main_algebraic.py` pipeline mirrors this approach and compares results directly.
 
-**`Original JL ClusterMarker Compute/JunLiang CAP02_Gait markers.txt`** -- Raw Vicon trajectory data (SHIN1-3, THIGH1-3 markers) from a reference dataset used in the original Mathematica implementation. Provides ground truth for cross-validation.
+**`Original JL ClusterMarker Compute/JunLiang CAP02_Gait markers.txt`**: Raw Vicon trajectory data (SHIN1-3, THIGH1-3 markers) from a reference dataset used in the original Mathematica implementation. Provides ground truth for cross-validation.
 
 ### Data
 
-**`data/04-Feb-Trials/`** -- Primary dataset from the 4 February motion capture session. Contains 11 CSV files: one static trial, three digitiser trials (two used by the pipeline), three rotation trials, two left-right dynamic trials, and two up-down dynamic trials.
+**`data/04-Feb-Trials/`**: Primary dataset from the 4 February motion capture session. Contains 11 CSV files: one static trial, three digitiser trials (two used by the pipeline), three rotation trials, two left-right dynamic trials, and two up-down dynamic trials.
 
-**`data/21-Nov-Trials/`** -- Earlier dataset from the 21 November motion capture session. Contains 15 CSV files with a different marker naming convention. Includes static trials with integrated digitiser passes, rotation trials, bending/varus motion trials, and Centre of Rotation (COR) trials.
+**`data/21-Nov-Trials/`**: Earlier dataset from the 21 November motion capture session. Contains 15 CSV files with a different marker naming convention. Includes static trials with integrated digitiser passes, rotation trials, bending/varus motion trials, and Centre of Rotation (COR) trials.
 
 ### Outputs
 
@@ -175,7 +175,7 @@ An **alternative algebraic pipeline** (`main_algebraic.py`) replaces the nonline
 
 ### Documentation
 
-**`docs/algorithm_specification.md`** -- Complete mathematical and algorithmic specification of the pipeline (880 lines). Covers LCS construction via SVD, the Kabsch algorithm, HJC sphere-fitting, KJC and AJC midpoint definitions, frontal plane construction, all five angle definitions with formulae, error analysis framework (rigidity checks, sphere-fit residuals, Monte Carlo sensitivity), and evaluation methodology. Includes seven peer-reviewed references.
+**`docs/algorithm_specification.md`**: Complete mathematical and algorithmic specification of the pipeline (880 lines). Covers LCS construction via SVD, the Kabsch algorithm, HJC sphere-fitting, KJC and AJC midpoint definitions, frontal plane construction, all five angle definitions with formulae, error analysis framework (rigidity checks, sphere-fit residuals, Monte Carlo sensitivity), and evaluation methodology. Includes seven peer-reviewed references.
 
 ---
 
